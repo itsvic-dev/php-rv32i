@@ -2,4 +2,11 @@
   pkgs ? import <nixpkgs> { },
 }:
 with pkgs;
-mkShell { buildInputs = [ php ]; }
+mkShell {
+  buildInputs = [
+    php
+    gnumake
+    libllvm
+    clang
+  ];
+}
