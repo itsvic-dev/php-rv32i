@@ -7,6 +7,7 @@ mkShell {
     php
     gnumake
     libllvm
+    lld
     clang
   ];
 }

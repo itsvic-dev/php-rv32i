@@ -6,5 +6,9 @@ all: $(OBJS)
 %.o: %.s
 	clang --target=riscv32 -march=rv32i -c $< -o $@
 
-%.bin : %.o
-	llvm-objcopy -O binary $< $@
+%.bin: %.o
+	ld.lld --oformat=binary -T linker.ld $< -o $@
+
+.PHONY: clean
+clean:
+	rm -f $(OBJS)

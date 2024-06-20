@@ -66,6 +66,10 @@ class CPU {
     $opcode = $this->get_bits_at_offset($instruction, 7, 0);
     
     switch($opcode) {
+      case 0b0110111:
+        return $this->opcode_lui($instruction);
+      case 0b0000011:
+        return $this->opcodes_load($instruction);
       case 0b0010011:
         return $this->opcodes_immediate_math($instruction);
       case 0b1110011:
@@ -89,6 +93,7 @@ class CPU {
 
     switch ($funct3) {
       case 0b000: // ADDI
+        print("addi x$rd, x$rs1, $imm\n");
         $this->regs[$rd] = ($this->regs[$rs1] + $imm) & 0xFFFFFFFF;
         return;
       default:
@@ -118,6 +123,47 @@ class CPU {
     }
   }
 
+  private function opcode_lui($instruction) {
+    $rd = $this->get_bits_at_offset($instruction, 5, 7);
+    $imm = $this->get_bits_at_offset($instruction, 20, 12);
+    print("lui x$rd, $imm\n");
+    $this->regs[$rd] = $imm << 12;
+  }
+
+  private function opcodes_load($instruction) {
+    $rd = $this->get_bits_at_offset($instruction, 5, 7);
+    $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
+    $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
+    $imm = $this->sign_extended_immediate($instruction, 12, 20);
+    
+    $val = $this->regs[$rs1];
+    
+    $effectiveAddress = $this->regs[$rs1] + $imm;
+
+    switch ($funct3) {
+      case 0b000: // load byte
+        print("lb x$rd, x$rs1, $imm\n");
+        $this->regs[$rd] = $this->sign_extended_immediate($this->bus->read($effectiveAddress), 8, 0);
+        return;
+      case 0b100: // load byte unsigned
+        print("lbu x$rd, x$rs1, $imm\n");
+        $this->regs[$rd] = $this->bus->read($effectiveAddress);
+        return;
+      case 0b001: // load half-word
+        print("lh x$rd, x$rs1, $imm\n");
+        $this->regs[$rd] = $this->sign_extended_immediate($this->load_halfword($effectiveAddress), 16, 0);
+        return;
+      case 0b101: // load half-word unsigned
+        print("lhu x$rd, x$rs1, $imm\n");
+        $this->regs[$rd] = $this->load_halfword($effectiveAddress);
+        return;
+      case 0b010: // load word
+        print("lw x$rd, x$rs1, $imm\n");
+        $this->regs[$rd] = $this->load_word($effectiveAddress);
+        return;
+    }
+  }
+
   // Helper functions
   private function fetch_instruction(): int {
     $value = $this->bus->read($this->pc++);
@@ -128,6 +174,18 @@ class CPU {
       $value |= $this->bus->read($this->pc++) << 24;
     }
     return $value;
+  }
+
+  private function load_halfword(int $addr): int {
+    return $this->bus->read($addr)
+      | $this->bus->read($addr + 1) << 8;
+  }
+
+  private function load_word(int $addr): int {
+    return $this->bus->read($addr)
+      | $this->bus->read($addr + 1) << 8
+      | $this->bus->read($addr + 2) << 16
+      | $this->bus->read($addr + 3) << 24;
   }
 
   private static function get_bits_at_offset($instruction, $length, $offset) {
