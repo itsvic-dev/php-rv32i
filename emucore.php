@@ -4,6 +4,8 @@
 
 namespace Vic\Riscy;
 
+const INSN_LOGS = false;
+
 // register defines
 const REG_ZERO = 0;
 const REG_RA = 1; // return address
@@ -72,6 +74,8 @@ class CPU {
         return $this->opcodes_load($instruction);
       case 0b0010011:
         return $this->opcodes_immediate_math($instruction);
+      case 0b1100011:
+        return $this->opcodes_branch($instruction);
       case 0b1110011:
         return $this->opcodes_system($instruction);
       default:
@@ -89,11 +93,11 @@ class CPU {
     $rd = $this->get_bits_at_offset($instruction, 5, 7);
     $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
     // SLLI, SRLI, SRAI have a "shamt" instead, using the rest of the immediate as extra function space
-    $imm = $this->sign_extended_immediate($instruction, 12, 20);
+    $imm = $this->i_immediate($instruction);
 
     switch ($funct3) {
       case 0b000: // ADDI
-        print("addi x$rd, x$rs1, $imm\n");
+        INSN_LOGS && print("addi x$rd, x$rs1, $imm\n");
         $this->regs[$rd] = ($this->regs[$rs1] + $imm) & 0xFFFFFFFF;
         return;
       default:
@@ -126,7 +130,7 @@ class CPU {
   private function opcode_lui($instruction) {
     $rd = $this->get_bits_at_offset($instruction, 5, 7);
     $imm = $this->get_bits_at_offset($instruction, 20, 12);
-    print("lui x$rd, $imm\n");
+    INSN_LOGS && print("lui x$rd, $imm\n");
     $this->regs[$rd] = $imm << 12;
   }
 
@@ -134,7 +138,7 @@ class CPU {
     $rd = $this->get_bits_at_offset($instruction, 5, 7);
     $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
     $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
-    $imm = $this->sign_extended_immediate($instruction, 12, 20);
+    $imm = $this->i_immediate($instruction, PHP_INT_SIZE == 8);
     
     $val = $this->regs[$rs1];
     
@@ -142,25 +146,48 @@ class CPU {
 
     switch ($funct3) {
       case 0b000: // load byte
-        print("lb x$rd, x$rs1, $imm\n");
+        INSN_LOGS && print("lb x$rd, x$rs1, $imm\n");
         $this->regs[$rd] = $this->sign_extended_immediate($this->bus->read($effectiveAddress), 8, 0);
         return;
       case 0b100: // load byte unsigned
-        print("lbu x$rd, x$rs1, $imm\n");
+        INSN_LOGS && print("lbu x$rd, x$rs1, $imm\n");
         $this->regs[$rd] = $this->bus->read($effectiveAddress);
         return;
       case 0b001: // load half-word
-        print("lh x$rd, x$rs1, $imm\n");
+        INSN_LOGS && print("lh x$rd, x$rs1, $imm\n");
         $this->regs[$rd] = $this->sign_extended_immediate($this->load_halfword($effectiveAddress), 16, 0);
         return;
       case 0b101: // load half-word unsigned
-        print("lhu x$rd, x$rs1, $imm\n");
+        INSN_LOGS && print("lhu x$rd, x$rs1, $imm\n");
         $this->regs[$rd] = $this->load_halfword($effectiveAddress);
         return;
       case 0b010: // load word
-        print("lw x$rd, x$rs1, $imm\n");
+        INSN_LOGS && print("lw x$rd, x$rs1, $imm\n");
         $this->regs[$rd] = $this->load_word($effectiveAddress);
         return;
+    }
+  }
+
+  private function opcodes_branch($instruction) {
+    $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
+    $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
+    $rs2 = $this->get_bits_at_offset($instruction, 5, 20);
+    $imm = $this->b_immediate($instruction, PHP_INT_SIZE == 8);
+
+    // idk if its -4 or not, guess we'll see!!!
+    $effectiveAddress = $imm + $this->pc - 4;
+
+    switch ($funct3) {
+      case 0b000:
+        INSN_LOGS && print("beq x$rs1, x$rs2, $effectiveAddress\n");
+        if ($this->regs[$rs1] == $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        return;
+      case 0b001:
+        INSN_LOGS && print("bne x$rs1, x$rs2, $effectiveAddress\n");
+        if ($this->regs[$rs1] != $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        return;
+      default:
+        throw new UnknownOpcodeException($funct3);
     }
   }
 
@@ -192,13 +219,25 @@ class CPU {
     return ($instruction >> $offset) & ((1 << $length) - 1);
   }
 
-  private static function sign_extended_immediate($instruction, $length, $offset) {
-    // extract immediate, leaving sign bit as is
-    $imm = ($instruction >> $offset) & ((1 << $length) - 1);
-    // get sign bit from immediate
-    $sign = $imm >> ($length - 1);
-    // move the sign bit to the 31st place
-    $imm = ($imm & ((1 << $length - 1) - 1)) | ($sign << 31);
+  private static function i_immediate($instruction, bool $sign64 = false) {
+    $imm = CPU::get_bits_at_offset($instruction, 11, 20);
+    $sign = $instruction >> 31;
+    if ($sign) {
+      $imm |= ((1 << (($sign64 ? 64 : 32) - 11)) - 1) << 11;
+    }
+
+    return $imm;
+  }
+
+  private static function b_immediate($instruction, bool $sign64 = false) {
+    $imm = CPU::get_bits_at_offset($instruction, 4, 8) << 1;
+    $imm |= CPU::get_bits_at_offset($instruction, 6, 25) << 5;
+    $imm |= (($instruction >> 7) & 1) << 11;
+    $sign = $instruction >> 31;
+    if ($sign) {
+      $imm |= ((1 << (($sign64 ? 64 : 32) - 12)) - 1) << 12;
+    }
+
     return $imm;
   }
 };

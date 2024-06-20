@@ -28,7 +28,10 @@ class TestMachine implements Machine {
       // SBI: legacy putchar
       print(chr($cpu->regs[\Vic\Riscy\REG_A0]));
       $cpu->regs[\Vic\Riscy\REG_A0] = 0;
+      return;
     }
+
+    // anything else halts the machine
     $this->running = false;
   }
 }

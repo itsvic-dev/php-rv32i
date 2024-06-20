@@ -1,4 +1,4 @@
-OBJS := test.bin
+OBJS := test.bin mintest.bin
 
 all: $(OBJS)
 .PHONY: all

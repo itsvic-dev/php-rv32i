@@ -14,7 +14,7 @@ loop:
   ecall
   lbu a0, 0(a1)
   addi a1, a1, 1
-  bnez a1, loop
+  bnez a0, loop
 
 end:
   // exits
