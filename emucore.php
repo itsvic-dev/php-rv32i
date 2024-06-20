@@ -68,6 +68,8 @@ class CPU {
     $opcode = $this->get_bits_at_offset($instruction, 7, 0);
     
     switch($opcode) {
+      case 0b0010111:
+        return $this->opcode_auipc($instruction);
       case 0b0110111:
         return $this->opcode_lui($instruction);
       case 0b0000011:
@@ -127,11 +129,19 @@ class CPU {
     }
   }
 
+  private function opcode_auipc($instruction) {
+    $rd = $this->get_bits_at_offset($instruction, 5, 7);
+    $imm = $this->u_immediate($instruction);
+    $addr = $this->pc - 4 + $imm;
+    INSN_LOGS && print("auipc x$rd, $addr\n");
+    $this->regs[$rd] = $addr;
+  }
+
   private function opcode_lui($instruction) {
     $rd = $this->get_bits_at_offset($instruction, 5, 7);
-    $imm = $this->get_bits_at_offset($instruction, 20, 12);
+    $imm = $this->u_immediate($instruction);
     INSN_LOGS && print("lui x$rd, $imm\n");
-    $this->regs[$rd] = $imm << 12;
+    $this->regs[$rd] = $imm;
   }
 
   private function opcodes_load($instruction) {
@@ -239,5 +249,9 @@ class CPU {
     }
 
     return $imm;
+  }
+
+  private static function u_immediate($instruction, bool $sign64 = false) {
+    return CPU::get_bits_at_offset($instruction, 20, 12) << 12;
   }
 };

@@ -9,7 +9,7 @@ class TestMachine implements Machine {
   public bool $running = true;
 
   public function __construct() {
-    $contents = file_get_contents("test.bin");
+    $contents = file_get_contents("test.c.bin");
     $this->ram = array_values(unpack('C*', $contents));
   }
   
