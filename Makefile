@@ -1,11 +1,11 @@
-SRCS := test.s test.c
+SRCS := test.c
 OBJS := $(addsuffix .bin,$(SRCS))
 
 all: $(OBJS)
 .PHONY: all
 
 %.c.o: %.c
-	clang --target=riscv32 -march=rv32i -mabi=ilp32 -nostdlib -nostdinc -fno-asynchronous-unwind-tables -O -c $< -o $@
+	clang -MD --target=riscv32 -march=rv32i -mabi=ilp32 -nostdlib -nostdinc -fno-asynchronous-unwind-tables -O -c $< -o $@
 
 %.s.o: %.s
 	clang --target=riscv32 -march=rv32i -c $< -o $@
@@ -15,4 +15,6 @@ all: $(OBJS)
 
 .PHONY: clean
 clean:
-	rm -f $(OBJS)
+	rm -f $(OBJS) $(addsuffix .o,$(SRCS))
+
+-include $(addsuffix .d,$(SRCS))
