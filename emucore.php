@@ -81,6 +81,8 @@ class CPU {
         return $this->opcodes_store($instruction);
       case 0b0010011:
         return $this->opcodes_immediate_math($instruction);
+      case 0b0110011:
+        return $this->opcodes_math($instruction);
       case 0b1100011:
         return $this->opcodes_branch($instruction);
       case 0b1101111:
@@ -111,9 +113,50 @@ class CPU {
         INSN_LOGS && print("addi x$rd, x$rs1, $imm\n");
         $this->regs[$rd] = ($this->regs[$rs1] + $imm) & 0xFFFFFFFF;
         return;
+      case 0b111: // ANDI
+        INSN_LOGS && print("andi x$rd, x$rs1, $imm\n");
+        $this->regs[$rd] = ($this->regs[$rs1] & $imm) & 0xFFFFFFFF;
+        return;
       default:
         throw new UnknownOpcodeException($funct3);
     }
+  }
+
+  private function opcodes_math($instruction) {
+    $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
+    $funct7 = $this->get_bits_at_offset($instruction, 7, 25);
+    $rd = $this->get_bits_at_offset($instruction, 5, 7);
+    $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
+    $rs2 = $this->get_bits_at_offset($instruction, 5, 20);
+
+    $val1 = $this->regs[$rs1];
+    $val2 = $this->regs[$rs2];
+
+    switch ($funct3) {
+      case 0b000: // ADD/SUB
+        if ($funct7 == 0) {
+          INSN_LOGS && print("add x$rd, x$rs1, x$rs2\n");
+          $retval = $val2 + $val1;
+        } else {
+          INSN_LOGS && print("sub x$rd, x$rs1, x$rs2\n");
+          $retval = $val2 - $val1;
+        }
+        break;
+      case 0b101: // SRL/SRA
+        if ($funct7 == 0) {
+          INSN_LOGS && print("srl x$rd, x$rs1, x$rs2\n");
+          $shift = $val2 & 0b11111;
+          $retval = $val1 >> $shift & (PHP_INT_MAX >> ($shift == 0 ? 0 : $shift - 1));
+        } else {
+          INSN_LOGS && print("sra x$rd, x$rs1, x$rs2\n");
+          $retval = $val1 >> ($val2 & 0b11111);
+        }
+        break;
+      default:
+        throw new UnknownOpcodeException($funct3);
+    }
+
+    $this->regs[$rd] = $retval & 0xFFFFFFFF;
   }
 
   private function opcodes_system($instruction) {
