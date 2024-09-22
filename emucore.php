@@ -64,7 +64,7 @@ class CPU {
 
   public function execute_once() {
     $instruction = $this->fetch_instruction();
-    // print("pc=" . dechex($this->pc) . ", insn=" . dechex($instruction) . "\n");
+    INSN_LOGS && print("pc=" . dechex($this->pc) . ", insn=" . dechex($instruction) . "\n");
 
     $opcode = $this->get_bits_at_offset($instruction, 7, 0);
 
@@ -107,24 +107,51 @@ class CPU {
     $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
     // SLLI, SRLI, SRAI have a shift amount instead, using the rest of the immediate as extra function space
     $imm = $this->i_immediate($instruction);
+    $imm32 = $this->i_immediate($instruction, false);
     $shamt = $this->get_bits_at_offset($instruction, 5, 20);
+    $funct7 = $this->get_bits_at_offset($instruction, 7, 25);
 
     switch ($funct3) {
       case 0b000: // ADDI
         INSN_LOGS && print("addi x$rd, x$rs1, $imm\n");
-        $this->regs[$rd] = ($this->regs[$rs1] + $imm) & 0xFFFFFFFF;
-        return;
-      case 0b111: // ANDI
-        INSN_LOGS && print("andi x$rd, x$rs1, $imm\n");
-        $this->regs[$rd] = ($this->regs[$rs1] & $imm) & 0xFFFFFFFF;
-        return;
+        $retval = $this->regs[$rs1] + $imm;
+        break;
+
       case 0b001: // SLLI
         INSN_LOGS && print("slli x$rd, x$rs1, $shamt\n");
-        $this->regs[$rd] = ($this->regs[$rs1] << $shamt) & 0xFFFFFFFF;
-        return;
+        $retval = $this->regs[$rs1] << $shamt;
+        break;
+
+      case 0b011: // SLTIU
+        INSN_LOGS && print("sltiu x$rd, x$rs1, $imm32\n");
+        $retval = $this->regs[$rs1] < $imm32;
+        break;
+      
+      case 0b100: // XORI
+        INSN_LOGS && print("xori x$rd, x$rs1, $imm\n");
+        $retval = $this->regs[$rs1] ^ $imm;
+        break;
+
+      case 0b101: // SRLI/SRAI
+        if ($funct7 == 0) {
+          INSN_LOGS && print("srli x$rd, x$rs1, $shamt\n");
+          $retval = $this->regs[$rs1] >> $shamt & (PHP_INT_MAX >> ($shamt == 0 ? 0 : $shamt - 1));
+        } else {
+          INSN_LOGS && print("srai x$rd, x$rs1, $shamt\n");
+          $retval = $this->regs[$rs1] >> $shamt;
+        }
+        break;
+
+      case 0b111: // ANDI
+        INSN_LOGS && print("andi x$rd, x$rs1, $imm\n");
+        $retval = ($this->regs[$rs1] & $imm) & 0xFFFFFFFF;
+        break;
+
       default:
         throw new UnknownOpcodeException($funct3);
     }
+
+    $this->regs[$rd] = $retval & 0xFFFFFFFF;
   }
 
   private function opcodes_math($instruction) {
@@ -147,6 +174,17 @@ class CPU {
           $retval = $val2 - $val1;
         }
         break;
+      
+      case 0b001: // SLL
+        INSN_LOGS && print("sll x$rd, x$rs1, x$rs2\n");
+        $retval = $val1 << ($val2 & 0b11111);
+        break;
+
+      case 0b011: // SLTU
+        INSN_LOGS && print("sltu x$rd, x$rs1, x$rs2\n");
+        $retval = $val1 < $val2;
+        break;
+    
       case 0b101: // SRL/SRA
         if ($funct7 == 0) {
           INSN_LOGS && print("srl x$rd, x$rs1, x$rs2\n");
@@ -157,6 +195,22 @@ class CPU {
           $retval = $val1 >> ($val2 & 0b11111);
         }
         break;
+      
+      case 0b100: // XOR
+        INSN_LOGS && print("xor x$rd, x$rs1, x$rs2\n");
+        $retval = $val1 ^ $val2;
+        break;
+      
+      case 0b110: // OR
+        INSN_LOGS && print("or x$rd, x$rs1, x$rs2\n");
+        $retval = $val1 | $val2;
+        break;
+      
+      case 0b111: // AND
+        INSN_LOGS && print("and x$rd, x$rs1, x$rs2\n");
+        $retval = $val1 & $val2;
+        break;
+
       default:
         throw new UnknownOpcodeException($funct3);
     }
@@ -174,7 +228,7 @@ class CPU {
       case 0:
         // ECALL or EBREAK
         if ($csr == 0) {
-          // ECALL
+          INSN_LOGS && print("ecall\n");
           return $this->bus->handle_machine_ecall($this);
         } else {
           // EBREAK
@@ -212,7 +266,7 @@ class CPU {
     switch ($funct3) {
       case 0b000: // load byte
         INSN_LOGS && print("lb x$rd, x$rs1, $imm\n");
-        $this->regs[$rd] = $this->sign_extended_immediate($this->bus->read($effectiveAddress), 8, 0);
+        $this->regs[$rd] = $this->sign_extend($this->bus->read($effectiveAddress), 8);
         return;
       case 0b100: // load byte unsigned
         INSN_LOGS && print("lbu x$rd, x$rs1, $imm\n");
@@ -220,7 +274,7 @@ class CPU {
         return;
       case 0b001: // load half-word
         INSN_LOGS && print("lh x$rd, x$rs1, $imm\n");
-        $this->regs[$rd] = $this->sign_extended_immediate($this->load_halfword($effectiveAddress), 16, 0);
+        $this->regs[$rd] = $this->sign_extend($this->load_halfword($effectiveAddress), 16);
         return;
       case 0b101: // load half-word unsigned
         INSN_LOGS && print("lhu x$rd, x$rs1, $imm\n");
@@ -239,7 +293,7 @@ class CPU {
     $rs2 = $this->get_bits_at_offset($instruction, 5, 20);
     $imm = $this->s_immediate($instruction);
 
-    $effectiveAddress = $this->regs[$rs1] + $imm;
+    $effectiveAddress = ($this->regs[$rs1] + $imm) & 0xFFFFFFFF;
 
     switch($funct3) {
       case 0b000: // store byte
@@ -281,6 +335,11 @@ class CPU {
         return;
       case 0b100:
         INSN_LOGS && print("blt x$rs1, x$rs2, $effectiveAddress\n");
+        if ($this->regs[$rs1] < $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        return;
+      case 0b110:
+        // small problem: php doesn't speak unsigned!
+        INSN_LOGS && print("bltu x$rs1, x$rs2, $effectiveAddress\n");
         if ($this->regs[$rs1] < $this->regs[$rs2]) $this->pc = $effectiveAddress;
         return;
       default:
@@ -335,6 +394,14 @@ class CPU {
 
   private static function get_bits_at_offset($instruction, $length, $offset) {
     return ($instruction >> $offset) & ((1 << $length) - 1);
+  }
+
+  private static function sign_extend($value, $bits) {
+    $sign = ($value >> ($bits - 1)) & 1;
+    if ($sign) {
+      $value |= ((1 << (32 - $bits)) - 1) << $bits;
+    }
+    return $value;
   }
 
   private static function i_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8) {
