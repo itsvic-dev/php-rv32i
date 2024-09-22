@@ -105,8 +105,9 @@ class CPU {
     $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
     $rd = $this->get_bits_at_offset($instruction, 5, 7);
     $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
-    // SLLI, SRLI, SRAI have a "shamt" instead, using the rest of the immediate as extra function space
+    // SLLI, SRLI, SRAI have a shift amount instead, using the rest of the immediate as extra function space
     $imm = $this->i_immediate($instruction);
+    $shamt = $this->get_bits_at_offset($instruction, 5, 20);
 
     switch ($funct3) {
       case 0b000: // ADDI
@@ -116,6 +117,10 @@ class CPU {
       case 0b111: // ANDI
         INSN_LOGS && print("andi x$rd, x$rs1, $imm\n");
         $this->regs[$rd] = ($this->regs[$rs1] & $imm) & 0xFFFFFFFF;
+        return;
+      case 0b001: // SLLI
+        INSN_LOGS && print("slli x$rd, x$rs1, $shamt\n");
+        $this->regs[$rd] = ($this->regs[$rs1] << $shamt) & 0xFFFFFFFF;
         return;
       default:
         throw new UnknownOpcodeException($funct3);
@@ -273,6 +278,10 @@ class CPU {
       case 0b001:
         INSN_LOGS && print("bne x$rs1, x$rs2, $effectiveAddress\n");
         if ($this->regs[$rs1] != $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        return;
+      case 0b100:
+        INSN_LOGS && print("blt x$rs1, x$rs2, $effectiveAddress\n");
+        if ($this->regs[$rs1] < $this->regs[$rs2]) $this->pc = $effectiveAddress;
         return;
       default:
         throw new UnknownOpcodeException($funct3);
