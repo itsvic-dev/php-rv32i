@@ -164,12 +164,42 @@ class CPU {
     $val1 = $this->regs[$rs1];
     $val2 = $this->regs[$rs2];
 
+    if ($funct7 == 1) {
+      // M extension functions
+      switch ($funct3) {
+        case 0b000:
+          INSN_LOGS && print("mul x$rd, x$rs1, x$rs2\n");
+          $val1 = $this->sign_extend($val1, 32, PHP_INT_SIZE == 8);
+          $val2 = $this->sign_extend($val2, 32, PHP_INT_SIZE == 8);
+          $retval = gmp_intval(gmp_mul($val1, $val2));
+          break;
+        
+        case 0b001:
+          INSN_LOGS && print("mulh x$rd, x$rs1, x$rs2\n");
+          $val1 = $this->sign_extend($val1, 32, PHP_INT_SIZE == 8);
+          $val2 = $this->sign_extend($val2, 32, PHP_INT_SIZE == 8);
+          $retval = gmp_intval(gmp_mul($val1, $val2)) >> 32;
+          break;
+        
+        case 0b011:
+          INSN_LOGS && print("mulhu x$rd, x$rs1, x$rs2\n");
+          // should be unsigned but php is shit lololol
+          $retval = gmp_intval(gmp_mul($val1, $val2)) >> 32;
+          break;
+
+        default:
+          throw new UnknownOpcodeException($funct3);
+      }
+      $this->regs[$rd] = $retval & 0xFFFFFFFF;
+      return;
+    }
+
     switch ($funct3) {
-      case 0b000: // ADD/SUB
+      case 0b000: // ADD/SUB/MUL
         if ($funct7 == 0) {
           INSN_LOGS && print("add x$rd, x$rs1, x$rs2\n");
           $retval = $val2 + $val1;
-        } else {
+        } else if ($funct7 == 0b0100000) {
           INSN_LOGS && print("sub x$rd, x$rs1, x$rs2\n");
           $retval = $val2 - $val1;
         }
@@ -190,7 +220,7 @@ class CPU {
           INSN_LOGS && print("srl x$rd, x$rs1, x$rs2\n");
           $shift = $val2 & 0b11111;
           $retval = $val1 >> $shift & (PHP_INT_MAX >> ($shift == 0 ? 0 : $shift - 1));
-        } else {
+        } else if ($funct7 == 0b0100000) {
           INSN_LOGS && print("sra x$rd, x$rs1, x$rs2\n");
           $retval = $val1 >> ($val2 & 0b11111);
         }
@@ -396,10 +426,10 @@ class CPU {
     return ($instruction >> $offset) & ((1 << $length) - 1);
   }
 
-  private static function sign_extend($value, $bits) {
+  private static function sign_extend($value, $bits, bool $sign64 = false) {
     $sign = ($value >> ($bits - 1)) & 1;
     if ($sign) {
-      $value |= ((1 << (32 - $bits)) - 1) << $bits;
+      $value |= ((1 << (($sign64 ? 64 : 32) - $bits)) - 1) << $bits;
     }
     return $value;
   }
