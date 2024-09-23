@@ -200,10 +200,10 @@ class CPU {
       case 0b000: // ADD/SUB/MUL
         if ($funct7 == 0) {
           INSN_LOGS && print("add x$rd, x$rs1, x$rs2\n");
-          $retval = $val2 + $val1;
+          $retval = $val1 + $val2;
         } else if ($funct7 == 0b0100000) {
           INSN_LOGS && print("sub x$rd, x$rs1, x$rs2\n");
-          $retval = $val2 - $val1;
+          $retval = $val1 - $val2;
         }
         break;
       
@@ -224,7 +224,7 @@ class CPU {
           $retval = $val1 >> $shift & (PHP_INT_MAX >> ($shift == 0 ? 0 : $shift - 1));
         } else if ($funct7 == 0b0100000) {
           INSN_LOGS && print("sra x$rd, x$rs1, x$rs2\n");
-          $retval = $val1 >> ($val2 & 0b11111);
+          $retval = $this->sign_extend($val1, 32, PHP_INT_SIZE == 8) >> ($val2 & 0b11111);
         }
         break;
       
@@ -359,20 +359,20 @@ class CPU {
     switch ($funct3) {
       case 0b000:
         INSN_LOGS && print("beq x$rs1, x$rs2, $effectiveAddress\n");
-        if ($this->regs[$rs1] == $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        if ($this->regs[$rs1] == $this->regs[$rs2]) $this->pc = $effectiveAddress & 0xFFFFFFFF;
         return;
       case 0b001:
         INSN_LOGS && print("bne x$rs1, x$rs2, $effectiveAddress\n");
-        if ($this->regs[$rs1] != $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        if ($this->regs[$rs1] != $this->regs[$rs2]) $this->pc = $effectiveAddress & 0xFFFFFFFF;
         return;
       case 0b100:
         INSN_LOGS && print("blt x$rs1, x$rs2, $effectiveAddress\n");
-        if ($this->regs[$rs1] < $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        if ($this->regs[$rs1] < $this->regs[$rs2]) $this->pc = $effectiveAddress & 0xFFFFFFFF;
         return;
       case 0b110:
         // small problem: php doesn't speak unsigned!
         INSN_LOGS && print("bltu x$rs1, x$rs2, $effectiveAddress\n");
-        if ($this->regs[$rs1] < $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        if ($this->regs[$rs1] < $this->regs[$rs2]) $this->pc = $effectiveAddress & 0xFFFFFFFF;
         return;
       default:
         throw new UnknownOpcodeException($funct3);
@@ -385,7 +385,7 @@ class CPU {
     $effectiveAddress = $this->pc + $imm - 4;
     INSN_LOGS && print("jal x$rd, $effectiveAddress\n");
     $this->regs[$rd] = $this->pc;
-    $this->pc = $effectiveAddress;
+    $this->pc = $effectiveAddress & 0xFFFFFFFF;
   }
 
   private function opcode_jalr($instruction) {
@@ -395,8 +395,8 @@ class CPU {
 
     $effectiveAddress = ($this->regs[$rs1] + $imm) & ~1;
     $this->regs[$rd] = $this->pc;
-    $this->pc = $effectiveAddress;
-  
+    $this->pc = $effectiveAddress & 0xFFFFFFFF;
+
     INSN_LOGS && print("jalr x$rd, $imm(x$rs1)\n");
   }
 
