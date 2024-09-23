@@ -184,7 +184,9 @@ class CPU {
         case 0b011:
           INSN_LOGS && print("mulhu x$rd, x$rs1, x$rs2\n");
           // should be unsigned but php is shit lololol
-          $retval = gmp_intval(gmp_mul($val1, $val2)) >> 32;
+          // fwrite(STDERR, "DEBUG: $val1, $val2\n");
+          // fflush(STDERR);
+          $retval = gmp_intval(gmp_mul($val1, $val2) >> 32);
           break;
 
         default:
