@@ -356,23 +356,35 @@ class CPU {
     // idk if its -4 or not, guess we'll see!!!
     $effectiveAddress = $imm + $this->pc - 4;
 
+    $val1 = $this->regs[$rs1];
+    $val2 = $this->regs[$rs2];
+
     switch ($funct3) {
       case 0b000:
         INSN_LOGS && print("beq x$rs1, x$rs2, $effectiveAddress\n");
-        if ($this->regs[$rs1] == $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        if ($val1 == $val2) $this->pc = $effectiveAddress;
         return;
       case 0b001:
         INSN_LOGS && print("bne x$rs1, x$rs2, $effectiveAddress\n");
-        if ($this->regs[$rs1] != $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        if ($val1 != $val2) $this->pc = $effectiveAddress;
         return;
       case 0b100:
         INSN_LOGS && print("blt x$rs1, x$rs2, $effectiveAddress\n");
-        if ($this->regs[$rs1] < $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        if ($this->sign_extend($val1, 32, PHP_INT_SIZE == 8) < $this->sign_extend($val2, 32, PHP_INT_SIZE == 8)) $this->pc = $effectiveAddress;
+        return;
+      case 0b101:
+        INSN_LOGS && print("bge x$rs1, x$rs2, $effectiveAddress\n");
+        if ($this->sign_extend($val1, 32, PHP_INT_SIZE == 8) > $this->sign_extend($val2, 32, PHP_INT_SIZE == 8)) $this->pc = $effectiveAddress;
         return;
       case 0b110:
         // small problem: php doesn't speak unsigned!
         INSN_LOGS && print("bltu x$rs1, x$rs2, $effectiveAddress\n");
-        if ($this->regs[$rs1] < $this->regs[$rs2]) $this->pc = $effectiveAddress;
+        if ($val1 < $val2) $this->pc = $effectiveAddress;
+        return;
+      case 0b111:
+        // small problem: php doesn't speak unsigned!
+        INSN_LOGS && print("bgeu x$rs1, x$rs2, $effectiveAddress\n");
+        if ($val1 > $val2) $this->pc = $effectiveAddress;
         return;
       default:
         throw new UnknownOpcodeException($funct3);
