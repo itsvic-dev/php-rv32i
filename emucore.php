@@ -138,7 +138,7 @@ class CPU {
           $retval = $this->regs[$rs1] >> $shamt & (PHP_INT_MAX >> ($shamt == 0 ? 0 : $shamt - 1));
         } else {
           INSN_LOGS && print("srai x$rd, x$rs1, $shamt\n");
-          $retval = $this->regs[$rs1] >> $shamt;
+          $retval = $this->sign_extend($this->regs[$rs1], 32, PHP_INT_SIZE == 8) >> $shamt;
         }
         break;
 
