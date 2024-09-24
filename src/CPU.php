@@ -9,15 +9,12 @@ use Vic\Riscy\UnknownOpcodeException;
 
 const INSN_LOGS = false;
 
-class CPU
-{
-    public function __construct(public Machine &$bus)
-    {
+class CPU {
+    public function __construct(public Machine &$bus) {
         $this->regs = array_fill(0, 32, 0);
     }
 
-    public function execute_once()
-    {
+    public function execute_once() {
         $instruction = $this->fetch_instruction();
         INSN_LOGS && print("pc=" . dechex($this->pc) . ", insn=" . dechex($instruction) . "\n");
 
@@ -56,8 +53,7 @@ class CPU
     public int $pc = 0;
 
     // Opcodes
-    private function opcodes_immediate_math($instruction)
-    {
+    private function opcodes_immediate_math($instruction) {
         $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
         $rd = $this->get_bits_at_offset($instruction, 5, 7);
         $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
@@ -110,8 +106,7 @@ class CPU
         $this->regs[$rd] = $retval & 0xFFFFFFFF;
     }
 
-    private function opcodes_math($instruction)
-    {
+    private function opcodes_math($instruction) {
         $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
         $funct7 = $this->get_bits_at_offset($instruction, 7, 25);
         $rd = $this->get_bits_at_offset($instruction, 5, 7);
@@ -207,8 +202,7 @@ class CPU
         $this->regs[$rd] = $retval & 0xFFFFFFFF;
     }
 
-    private function opcodes_system($instruction)
-    {
+    private function opcodes_system($instruction) {
         $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
         $rd = $this->get_bits_at_offset($instruction, 5, 7);
         $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
@@ -231,8 +225,7 @@ class CPU
         }
     }
 
-    private function opcode_auipc($instruction)
-    {
+    private function opcode_auipc($instruction) {
         $rd = $this->get_bits_at_offset($instruction, 5, 7);
         $imm = $this->u_immediate($instruction);
         $addr = $this->pc - 4 + $imm;
@@ -240,16 +233,14 @@ class CPU
         $this->regs[$rd] = $addr;
     }
 
-    private function opcode_lui($instruction)
-    {
+    private function opcode_lui($instruction) {
         $rd = $this->get_bits_at_offset($instruction, 5, 7);
         $imm = $this->u_immediate($instruction);
         INSN_LOGS && print("lui x$rd, $imm\n");
         $this->regs[$rd] = $imm;
     }
 
-    private function opcodes_load($instruction)
-    {
+    private function opcodes_load($instruction) {
         $rd = $this->get_bits_at_offset($instruction, 5, 7);
         $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
         $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
@@ -281,8 +272,7 @@ class CPU
         }
     }
 
-    private function opcodes_store($instruction)
-    {
+    private function opcodes_store($instruction) {
         $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
         $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
         $rs2 = $this->get_bits_at_offset($instruction, 5, 20);
@@ -310,8 +300,7 @@ class CPU
         }
     }
 
-    private function opcodes_branch($instruction)
-    {
+    private function opcodes_branch($instruction) {
         $funct3 = $this->get_bits_at_offset($instruction, 3, 12);
         $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
         $rs2 = $this->get_bits_at_offset($instruction, 5, 20);
@@ -367,8 +356,7 @@ class CPU
         }
     }
 
-    private function opcode_jal($instruction)
-    {
+    private function opcode_jal($instruction) {
         $rd = $this->get_bits_at_offset($instruction, 5, 7);
         $imm = $this->j_immediate($instruction);
         $effectiveAddress = $this->pc + $imm - 4;
@@ -377,8 +365,7 @@ class CPU
         $this->pc = $effectiveAddress & 0xFFFFFFFF;
     }
 
-    private function opcode_jalr($instruction)
-    {
+    private function opcode_jalr($instruction) {
         $rd = $this->get_bits_at_offset($instruction, 5, 7);
         $rs1 = $this->get_bits_at_offset($instruction, 5, 15);
         $imm = $this->i_immediate($instruction);
@@ -391,8 +378,7 @@ class CPU
     }
 
     // Helper functions
-    private function fetch_instruction(): int
-    {
+    private function fetch_instruction(): int {
         $value = $this->bus->read($this->pc++);
         $value |= $this->bus->read($this->pc++) << 8;
         if ($value & 0b11 == 0b11) {
@@ -403,27 +389,23 @@ class CPU
         return $value;
     }
 
-    private function load_halfword(int $addr): int
-    {
+    private function load_halfword(int $addr): int {
         return $this->bus->read($addr)
           | $this->bus->read($addr + 1) << 8;
     }
 
-    private function load_word(int $addr): int
-    {
+    private function load_word(int $addr): int {
         return $this->bus->read($addr)
           | $this->bus->read($addr + 1) << 8
           | $this->bus->read($addr + 2) << 16
           | $this->bus->read($addr + 3) << 24;
     }
 
-    private static function get_bits_at_offset($instruction, $length, $offset)
-    {
+    private static function get_bits_at_offset($instruction, $length, $offset) {
         return ($instruction >> $offset) & ((1 << $length) - 1);
     }
 
-    private static function sign_extend($value, $bits, bool $sign64 = false)
-    {
+    private static function sign_extend($value, $bits, bool $sign64 = false) {
         $sign = ($value >> ($bits - 1)) & 1;
         if ($sign) {
             $value |= ((1 << (($sign64 ? 64 : 32) - $bits)) - 1) << $bits;
@@ -431,8 +413,7 @@ class CPU
         return $value;
     }
 
-    private static function i_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8)
-    {
+    private static function i_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8) {
         $imm = CPU::get_bits_at_offset($instruction, 11, 20);
         $sign = $instruction >> 31;
         if ($sign) {
@@ -442,8 +423,7 @@ class CPU
         return $imm;
     }
 
-    private static function s_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8)
-    {
+    private static function s_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8) {
         $imm = CPU::get_bits_at_offset($instruction, 5, 7);
         $imm |= CPU::get_bits_at_offset($instruction, 6, 25) << 5;
         $sign = $instruction >> 31;
@@ -454,8 +434,7 @@ class CPU
         return $imm;
     }
 
-    private static function b_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8)
-    {
+    private static function b_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8) {
         $imm = CPU::get_bits_at_offset($instruction, 4, 8) << 1;
         $imm |= CPU::get_bits_at_offset($instruction, 6, 25) << 5;
         $imm |= (($instruction >> 7) & 1) << 11;
@@ -467,13 +446,11 @@ class CPU
         return $imm;
     }
 
-    private static function u_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8)
-    {
+    private static function u_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8) {
         return CPU::get_bits_at_offset($instruction, 20, 12) << 12;
     }
 
-    private static function j_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8)
-    {
+    private static function j_immediate($instruction, bool $sign64 = PHP_INT_SIZE == 8) {
         $imm = CPU::get_bits_at_offset($instruction, 10, 21) << 1;
         $imm |= (($instruction >> 20) & 1) << 11;
         $imm |= CPU::get_bits_at_offset($instruction, 8, 12) << 12;

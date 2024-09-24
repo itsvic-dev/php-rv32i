@@ -2,8 +2,7 @@
 
 namespace Vic\Riscy;
 
-class Constants
-{
+class Constants {
     // register defines
     public const REG_ZERO = 0;
     public const REG_RA = 1; // return address

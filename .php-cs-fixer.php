@@ -9,6 +9,10 @@ return (new PhpCsFixer\Config())
         '@PER-CS' => true,
         '@PHP82Migration' => true,
         'array_syntax' => ['syntax' => 'short'],
+        'braces_position' => [
+            'functions_opening_brace' => 'same_line',
+            'classes_opening_brace' => 'same_line',
+        ],
     ])
     ->setFinder($finder)
 ;
