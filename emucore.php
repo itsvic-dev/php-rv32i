@@ -384,7 +384,7 @@ class CPU {
       case 0b111:
         // small problem: php doesn't speak unsigned!
         INSN_LOGS && print("bgeu x$rs1, x$rs2, $effectiveAddress\n");
-        if ($val1 > $val2) $this->pc = $effectiveAddress;
+        if ($val1 > $val2) $this->pc = $effectiveAddress & 0xFFFFFFFF;
         return;
       default:
         throw new UnknownOpcodeException($funct3);
