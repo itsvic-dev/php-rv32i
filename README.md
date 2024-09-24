@@ -1,5 +1,15 @@
-# php-rv32i
+# Riscy
 
-this is a RISC-V (RV32I) emulator written in pure PHP. it is very incomplete, and barely implemented any of the RV32I spec, but it works on small C and assembly programs
+Riscy is a RISC-V emulator written in pure PHP.
+It implements a subset of the `RV32IM` architecture, just enough to run small, specialized C programs for my purposes.
 
-i might use this more in other projects internally so i might turn this into a composer project/library/whatever
+Riscy is used internally in Nova v1.3.0+ to run binary blobs.
+It has been tested only on 64-bit PHP. There may be issues when running on 32-bit PHP because of the different integer size.
+
+This emulator is not meant to be a general-purpose emulator, it will not boot Linux or OpenSBI or anything.
+You are expected to implement your own hypercalls for your software.
+
+## Future plans
+
+- maybe fully implementing the `RV32IM` spec
+- maybe implementing the `C` extension to reduce code size

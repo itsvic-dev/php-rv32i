@@ -1,3 +1,4 @@
-*.o
-*.bin
-*.d
+.direnv
+.envrc
+vendor/
+.php-cs-fixer.cache
