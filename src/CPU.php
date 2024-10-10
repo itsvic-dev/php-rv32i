@@ -94,6 +94,11 @@ class CPU {
                 }
                 break;
 
+            case 0b110: // ORI
+                INSN_LOGS && print("ori x$rd, x$rs1, $imm\n");
+                $retval = ($this->regs[$rs1] | $imm) & 0xFFFFFFFF;
+		break;
+
             case 0b111: // ANDI
                 INSN_LOGS && print("andi x$rd, x$rs1, $imm\n");
                 $retval = ($this->regs[$rs1] & $imm) & 0xFFFFFFFF;
